@@ -3,14 +3,13 @@ package com.example.consumer.controller;
 import com.example.consumer.model.KafkaMessage;
 import com.example.consumer.service.KafkaProducerService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 /**
- * REST controller for testing the Kafka logging framework.
- * Provides endpoints to send test messages to Kafka.
+ * Controller for testing the Kafka logging framework.
+ * Provides endpoints to send test messages and trigger different scenarios.
  */
 @RestController
 @RequestMapping("/api/test")
@@ -20,30 +19,48 @@ public class TestController {
     private KafkaProducerService producerService;
     
     /**
-     * Send a normal test message to Kafka.
+     * Send a test message to Kafka.
      * 
      * @param content The message content
-     * @param sender The message sender
-     * @return The message that was sent
+     * @return The sent message
      */
-    @GetMapping("/send")
-    public KafkaMessage sendMessage(
-            @RequestParam(defaultValue = "Test message") String content,
-            @RequestParam(defaultValue = "TestSender") String sender) {
-        return producerService.sendMessage(content, sender);
+    @PostMapping("/send")
+    public KafkaMessage sendMessage(@RequestParam String content) {
+        KafkaMessage message = new KafkaMessage();
+        message.setId(UUID.randomUUID().toString());
+        message.setContent(content);
+        message.setTimestamp(System.currentTimeMillis());
+        
+        producerService.sendMessage(message);
+        
+        return message;
     }
     
     /**
-     * Send a test message that will cause an exception.
+     * Send a test message that will trigger an error.
      * 
      * @param content The message content
-     * @param sender The message sender
-     * @return The message that was sent
+     * @return The sent message
      */
-    @GetMapping("/send-error")
-    public KafkaMessage sendErrorMessage(
-            @RequestParam(defaultValue = "Error message") String content,
-            @RequestParam(defaultValue = "ErrorSender") String sender) {
-        return producerService.sendErrorMessage(content, sender);
+    @PostMapping("/send-error")
+    public KafkaMessage sendErrorMessage(@RequestParam String content) {
+        KafkaMessage message = new KafkaMessage();
+        message.setId("error-trigger");
+        message.setContent(content);
+        message.setTimestamp(System.currentTimeMillis());
+        
+        producerService.sendMessage(message);
+        
+        return message;
+    }
+    
+    /**
+     * Get test status.
+     * 
+     * @return Status message
+     */
+    @GetMapping("/status")
+    public String getStatus() {
+        return "Kafka Logging Framework Test Controller is running";
     }
 }

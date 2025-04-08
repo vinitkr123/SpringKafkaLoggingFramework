@@ -1,44 +1,29 @@
-# Spring Kafka Logging Framework
+# Spring Kafka Logging Framework - Enhanced Version
 
-A non-invasive logging framework for Spring Kafka applications that logs Kafka consumer operations without requiring code modifications in the consuming applications.
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Requirements](#requirements)
-4. [Installation](#installation)
-5. [Usage](#usage)
-6. [Configuration](#configuration)
-7. [Advanced Usage](#advanced-usage)
-8. [Sample Application](#sample-application)
-9. [Contributing](#contributing)
-
-## Overview
-
-Spring Kafka Logging Framework is designed to provide comprehensive logging for Kafka consumer applications without requiring changes to the consumer's codebase. It uses Spring AOP to intercept method calls and automatically log Kafka operations, custom methods, and exceptions.
+A comprehensive logging framework for Spring Kafka applications that provides non-invasive logging of Kafka consumer operations, method execution status tracking, and configurable method selection.
 
 ## Features
 
-- **Non-invasive Integration**: Works without modifying consumer application code
-- **Predefined Function Logging**: Automatically logs data from predefined functions
-- **Custom Function Logging**: Configurable logging for additional functions
-- **Exception Handling**: Comprehensive logging of exceptions
-- **Configurable**: Extensive configuration options via properties or annotations
-- **Spring Boot Integration**: Seamless integration with Spring Boot applications
+- **Non-invasive logging**: Log Kafka consumer operations without modifying the consumer application code
+- **Dedicated log file**: Generate a separate log file specifically for Kafka operations and method executions
+- **Method status tracking**: Track and log method execution status (PASSED/FAILED)
+- **Configurable method selection**: Specify which methods to log through configuration
+- **Predefined function logging**: Log predefined functions based on patterns
+- **Custom function logging**: Add custom logging through annotations
+- **Exception handling**: Capture and log exceptions from consumer applications
+- **Flexible configuration**: Configure the framework through properties or annotations
 
-## Requirements
+## Getting Started
+
+### Prerequisites
 
 - Java 8 or higher
-- Spring Framework 5.x or higher
 - Spring Boot 2.x or higher
-- Spring Kafka 2.x or higher
+- Spring Kafka
 
-## Installation
+### Installation
 
-### Maven
-
-Add the following dependency to your `pom.xml`:
+Add the dependency to your Maven project:
 
 ```xml
 <dependency>
@@ -48,24 +33,13 @@ Add the following dependency to your `pom.xml`:
 </dependency>
 ```
 
-### Gradle
+### Basic Usage
 
-Add the following dependency to your `build.gradle`:
-
-```groovy
-implementation 'com.logging.framework:spring-kafka-logging-framework:1.0.0'
-```
-
-## Usage
-
-### Basic Setup
-
-1. Add the dependency to your project
-2. Enable the framework by adding `@EnableKafkaLogging` to your main application class:
+1. Enable the framework in your Spring Boot application:
 
 ```java
-@EnableKafkaLogging
 @SpringBootApplication
+@EnableKafkaLogging
 public class MyApplication {
     public static void main(String[] args) {
         SpringApplication.run(MyApplication.class, args);
@@ -73,178 +47,159 @@ public class MyApplication {
 }
 ```
 
-That's it! The framework will automatically log:
-- All Kafka consumer methods (annotated with `@KafkaListener`)
-- Methods matching predefined patterns in configuration
-- Methods explicitly annotated with `@LogMethod`
-- Exceptions thrown during Kafka message processing
+2. Configure the framework in your `application.properties` or `application.yml`:
 
-### Logging Kafka Consumer Methods
+```properties
+# Kafka Logging Framework Configuration
+kafka.logging.enabled=true
+kafka.logging.log-level=INFO
 
-Kafka consumer methods are automatically logged without any additional configuration:
+# Log File Configuration
+kafka.logging.log-file.enabled=true
+kafka.logging.log-file.path=./logs
+kafka.logging.log-file.filename=kafka-consumer.log
+```
+
+3. That's it! The framework will automatically log Kafka consumer operations and method executions based on the configuration.
+
+## Configuration Options
+
+### Main Configuration Properties
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `kafka.logging.enabled` | Enable/disable the logging framework | `true` |
+| `kafka.logging.log-level` | Log level for logging events | `INFO` |
+| `kafka.logging.include-payload` | Include message payloads in logs | `true` |
+| `kafka.logging.mask-sensitive-data` | Mask sensitive data in logs | `true` |
+| `kafka.logging.async-logging` | Use asynchronous logging | `true` |
+| `kafka.logging.sensitive-fields` | List of sensitive field names to mask | `password,creditCard,ssn` |
+
+### Log File Configuration
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `kafka.logging.log-file.enabled` | Enable/disable dedicated log file | `true` |
+| `kafka.logging.log-file.path` | Path to the log file directory | `./logs` |
+| `kafka.logging.log-file.filename` | Name of the log file | `kafka-logging.log` |
+| `kafka.logging.log-file.max-size` | Maximum size of the log file before rotation | `10MB` |
+| `kafka.logging.log-file.max-history` | Maximum number of log files to keep | `7` |
+| `kafka.logging.log-file.pattern` | Log pattern for the file | `[%d{yyyy-MM-dd HH:mm:ss}] [%p] [%X{status}] [%X{class}#%X{method}] - %m%n` |
+
+### Method Selection Configuration
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `kafka.logging.method-selection.enabled` | Enable/disable method selection | `true` |
+| `kafka.logging.method-selection.log-all-by-default` | Log all methods by default | `false` |
+| `kafka.logging.method-selection.log-exceptions` | Log methods that throw exceptions | `true` |
+| `kafka.logging.method-selection.include-method-patterns` | Method patterns to include | `process*,handle*,consume*` |
+| `kafka.logging.method-selection.exclude-method-patterns` | Method patterns to exclude | `get*,set*,is*` |
+| `kafka.logging.method-selection.include-class-patterns` | Class patterns to include | `*Service,*Consumer,*Handler` |
+| `kafka.logging.method-selection.include-package-patterns` | Package patterns to include | `com.example.consumer` |
+
+## Advanced Usage
+
+### Enabling the Framework with Options
+
+You can customize the framework behavior using the `@EnableKafkaLogging` annotation:
 
 ```java
-@Service
-public class MyConsumerService {
-    
-    @KafkaListener(topics = "my-topic", groupId = "my-group")
-    public void processMessage(MyMessage message) {
-        // This method will be automatically logged
-        // No additional code needed
+@SpringBootApplication
+@EnableKafkaLogging(
+    enableMethodSelection = true,
+    enableLogFile = true,
+    enableStatusTracking = true
+)
+public class MyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
     }
 }
 ```
 
-### Logging Custom Methods
+### Logging Specific Methods
 
-To log custom methods beyond the predefined set, use the `@LogMethod` annotation:
+You can use the `@LogMethodPattern` annotation to specify which methods to log in a class:
+
+```java
+@Service
+@LogMethodPattern(
+    value = {"process*", "handle*", "save*"},
+    exclude = {"getConfig", "isEnabled"}
+)
+public class MyService {
+    // Methods matching the patterns will be logged
+}
+```
+
+### Logging Individual Methods
+
+You can use the `@LogMethod` annotation to log specific methods:
 
 ```java
 @Service
 public class MyService {
     
-    @LogMethod(level = "DEBUG", includeArgs = true, includeResult = true)
-    public String processData(String data) {
-        // This method will be logged with the specified options
-        return data.toUpperCase();
+    @LogMethod(
+        includeArgs = true,
+        includeResult = true,
+        logExecutionTime = true,
+        description = "Processing important data"
+    )
+    public Result processData(Data data) {
+        // Method implementation
     }
 }
 ```
 
-## Configuration
+## Method Status Tracking
 
-### Application Properties
+The framework tracks the execution status of methods and logs it in the dedicated log file:
 
-Configure the framework using the following properties in `application.properties` or `application.yml`:
+- **IN_PROGRESS**: Method execution has started
+- **PASSED**: Method execution completed successfully
+- **FAILED**: Method execution failed with an exception
 
-```properties
-# Enable/disable the framework
-kafka.logging.enabled=true
+Example log entries:
 
-# Predefined method patterns to log
-kafka.logging.predefined-methods[0]=com.example.service.*Service.process*
-kafka.logging.predefined-methods[1]=com.example.kafka.*Consumer.consume*
-
-# Log level for logging events
-kafka.logging.log-level=INFO
-
-# Include message payloads in logs
-kafka.logging.include-payload=true
-
-# Mask sensitive data in logs
-kafka.logging.mask-sensitive-data=true
-
-# Sensitive fields to mask
-kafka.logging.sensitive-fields[0]=password
-kafka.logging.sensitive-fields[1]=creditCard
-
-# Use asynchronous logging
-kafka.logging.async-logging=true
+```
+[2025-04-08 02:30:15] [INFO] [PASSED] [KafkaConsumerService#processMessage] - Method executed successfully | Duration: 15 ms
+[2025-04-08 02:30:20] [ERROR] [FAILED] [KafkaConsumerService#saveMessage] - Method execution failed | Exception: RuntimeException: Error saving message
 ```
 
-### Annotation Options
+## Exception Handling
 
-#### @EnableKafkaLogging
+The framework automatically captures and logs exceptions from consumer applications:
 
-Main annotation to enable the framework:
-
-```java
-@EnableKafkaLogging
-@SpringBootApplication
-public class MyApplication {
-    // ...
-}
-```
-
-#### @LogKafkaConsumer
-
-Optional annotation for Kafka consumer methods with additional options:
-
-```java
-@LogKafkaConsumer(level = "DEBUG", includePayload = true, includeHeaders = true)
-@KafkaListener(topics = "my-topic")
-public void processMessage(MyMessage message) {
-    // ...
-}
-```
-
-Options:
-- `level`: Log level (default: "INFO")
-- `includePayload`: Whether to include the message payload (default: true)
-- `includeHeaders`: Whether to include message headers (default: true)
-- `logProcessingTime`: Whether to log processing time (default: true)
-
-#### @LogMethod
-
-Annotation for custom methods:
-
-```java
-@LogMethod(level = "DEBUG", includeArgs = true, includeResult = true, description = "Process data")
-public String processData(String data) {
-    // ...
-}
-```
-
-Options:
-- `level`: Log level (default: "INFO")
-- `includeArgs`: Whether to include method arguments (default: true)
-- `includeResult`: Whether to include method result (default: true)
-- `logExecutionTime`: Whether to log execution time (default: true)
-- `description`: Custom description to include in the log
-
-## Advanced Usage
-
-### Custom Error Handling
-
-The framework provides built-in error handling for Kafka consumers, but you can customize it by defining your own error handler:
-
-```java
-@Bean
-public ErrorHandler customErrorHandler(LoggingService loggingService) {
-    return new CustomLoggingErrorHandler(loggingService);
-}
-```
-
-### Masking Sensitive Data
-
-Configure sensitive fields to be masked in logs:
-
-```properties
-kafka.logging.mask-sensitive-data=true
-kafka.logging.sensitive-fields[0]=password
-kafka.logging.sensitive-fields[1]=creditCard
-kafka.logging.masking-char=*
-```
-
-### Asynchronous Logging
-
-For high-throughput applications, enable asynchronous logging:
-
-```properties
-kafka.logging.async-logging=true
-```
+1. When a method throws an exception, it's marked as FAILED
+2. The exception details are logged to the dedicated log file
+3. The original exception is re-thrown to allow normal application error handling
 
 ## Sample Application
 
-A sample application demonstrating the framework is included in the `sample-kafka-consumer` directory. It shows:
+A sample application is included in the repository to demonstrate the framework's features:
 
-1. Basic setup with `@EnableKafkaLogging`
-2. Automatic logging of Kafka consumer methods
-3. Predefined method logging based on configuration
-4. Custom method logging with `@LogMethod`
-5. Exception handling and logging
-
-To run the sample application:
-
-```bash
-cd sample-kafka-consumer
-./mvnw spring-boot:run
-```
-
-Test endpoints:
-- Send normal message: `GET /api/test/send?content=test&sender=user`
-- Send error message: `GET /api/test/send-error?content=test&sender=user`
+1. Clone the repository
+2. Build the framework and sample application:
+   ```
+   ./build.sh
+   ```
+3. Run the sample application:
+   ```
+   java -jar sample-kafka-consumer/target/sample-kafka-consumer-0.0.1-SNAPSHOT.jar
+   ```
+4. Use the test endpoints to send messages:
+   ```
+   curl -X POST "http://localhost:8080/api/test/send?content=test-message"
+   curl -X POST "http://localhost:8080/api/test/send-error?content=error-message"
+   ```
+5. Check the logs in the `./logs` directory
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -3,6 +3,7 @@ package com.logging.framework.aspect;
 import com.logging.framework.annotation.LogKafkaConsumer;
 import com.logging.framework.model.KafkaMessageContext;
 import com.logging.framework.model.LoggingEvent;
+import com.logging.framework.model.MethodExecutionStatus;
 import com.logging.framework.service.LoggingService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -53,6 +54,7 @@ public class KafkaConsumerLoggingAspect {
         event.setClassName(className);
         event.setMethodName(methodName);
         event.setArguments(args);
+        event.setStatus(MethodExecutionStatus.IN_PROGRESS);
         
         // Extract Kafka message context
         KafkaMessageContext kafkaMessageContext = extractKafkaMessageContext(method, args);
@@ -69,13 +71,31 @@ public class KafkaConsumerLoggingAspect {
         // Log method entry
         loggingService.logMethodEntry(className, methodName, args);
         
+        // Log initial status
+        loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.IN_PROGRESS, 
+                "Processing Kafka message from topic: " + (kafkaMessageContext.getTopic() != null ? kafkaMessageContext.getTopic() : "unknown"));
+        
         long startTime = System.currentTimeMillis();
         Object result = null;
         
         try {
             // Execute the method
             result = joinPoint.proceed();
+            
+            // Set status to PASSED
+            event.setStatus(MethodExecutionStatus.PASSED);
+            
             return result;
+        } catch (Throwable throwable) {
+            // Set status to FAILED
+            event.setStatus(MethodExecutionStatus.FAILED);
+            event.setException(throwable);
+            
+            // Log failure status
+            loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.FAILED, 
+                    "Failed to process Kafka message: " + throwable.getMessage());
+            
+            throw throwable;
         } finally {
             long executionTime = System.currentTimeMillis() - startTime;
             
@@ -86,8 +106,14 @@ public class KafkaConsumerLoggingAspect {
             // Log Kafka consumer event
             loggingService.logKafkaConsumerEvent(event);
             
-            // Log method exit
-            loggingService.logMethodExit(className, methodName, result, executionTime);
+            // Log method exit with status
+            loggingService.logMethodExit(className, methodName, result, executionTime, event.getStatus());
+            
+            // Log final status if successful
+            if (event.getStatus() == MethodExecutionStatus.PASSED) {
+                loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.PASSED, 
+                        "Successfully processed Kafka message in " + executionTime + " ms");
+            }
         }
     }
     

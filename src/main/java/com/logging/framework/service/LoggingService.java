@@ -1,6 +1,7 @@
 package com.logging.framework.service;
 
 import com.logging.framework.model.LoggingEvent;
+import com.logging.framework.model.MethodExecutionStatus;
 
 /**
  * Interface for logging services.
@@ -16,6 +17,17 @@ public interface LoggingService {
      * @param args The method arguments
      */
     void logMethodEntry(String className, String methodName, Object[] args);
+    
+    /**
+     * Log a method exit event.
+     * 
+     * @param className The class name
+     * @param methodName The method name
+     * @param result The method result
+     * @param executionTimeMs The method execution time in milliseconds
+     * @param status The method execution status
+     */
+    void logMethodExit(String className, String methodName, Object result, long executionTimeMs, MethodExecutionStatus status);
     
     /**
      * Log a method exit event.
@@ -50,4 +62,14 @@ public interface LoggingService {
      * @param event The logging event
      */
     void logEvent(LoggingEvent event);
+    
+    /**
+     * Log a method status event.
+     * 
+     * @param className The class name
+     * @param methodName The method name
+     * @param status The method execution status
+     * @param message Additional message
+     */
+    void logMethodStatus(String className, String methodName, MethodExecutionStatus status, String message);
 }

@@ -2,6 +2,7 @@ package com.logging.framework.aspect;
 
 import com.logging.framework.config.KafkaLoggingProperties;
 import com.logging.framework.model.LoggingEvent;
+import com.logging.framework.model.MethodExecutionStatus;
 import com.logging.framework.service.LoggingService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -60,9 +61,14 @@ public class PredefinedMethodLoggingAspect {
         event.setMethodName(methodName);
         event.setArguments(args);
         event.setLogLevel(properties.getLogLevel());
+        event.setStatus(MethodExecutionStatus.IN_PROGRESS);
         
         // Log method entry
         loggingService.logMethodEntry(simpleClassName, methodName, args);
+        
+        // Log initial status
+        loggingService.logMethodStatus(simpleClassName, methodName, MethodExecutionStatus.IN_PROGRESS, 
+                "Executing predefined method - Started");
         
         long startTime = System.currentTimeMillis();
         Object result = null;
@@ -70,10 +76,20 @@ public class PredefinedMethodLoggingAspect {
         try {
             // Execute the method
             result = joinPoint.proceed();
+            
+            // Set status to PASSED
+            event.setStatus(MethodExecutionStatus.PASSED);
+            
             return result;
         } catch (Throwable throwable) {
-            // Set exception in event
+            // Set status to FAILED and set exception
+            event.setStatus(MethodExecutionStatus.FAILED);
             event.setException(throwable);
+            
+            // Log failure status
+            loggingService.logMethodStatus(simpleClassName, methodName, MethodExecutionStatus.FAILED, 
+                    "Predefined method execution failed: " + throwable.getMessage());
+            
             throw throwable;
         } finally {
             long executionTime = System.currentTimeMillis() - startTime;
@@ -85,8 +101,14 @@ public class PredefinedMethodLoggingAspect {
             // Log the event
             loggingService.logEvent(event);
             
-            // Log method exit
-            loggingService.logMethodExit(simpleClassName, methodName, result, executionTime);
+            // Log method exit with status
+            loggingService.logMethodExit(simpleClassName, methodName, result, executionTime, event.getStatus());
+            
+            // Log final status if successful
+            if (event.getStatus() == MethodExecutionStatus.PASSED) {
+                loggingService.logMethodStatus(simpleClassName, methodName, MethodExecutionStatus.PASSED, 
+                        "Predefined method executed successfully in " + executionTime + " ms");
+            }
         }
     }
     
@@ -97,6 +119,12 @@ public class PredefinedMethodLoggingAspect {
      * @return True if the method is predefined, false otherwise
      */
     private boolean isMethodPredefined(String fullMethodName) {
+        // First check method selection configuration
+        if (isMethodSelected(fullMethodName)) {
+            return true;
+        }
+        
+        // Then check legacy predefined methods
         List<String> predefinedMethods = properties.getPredefinedMethods();
         
         if (predefinedMethods == null || predefinedMethods.isEmpty()) {
@@ -110,6 +138,59 @@ public class PredefinedMethodLoggingAspect {
                     .replace("*", ".*");
             
             if (Pattern.matches(regex, fullMethodName)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if a method is selected for logging based on the enhanced configuration.
+     * 
+     * @param fullMethodName The full method name (className.methodName)
+     * @return True if the method is selected, false otherwise
+     */
+    private boolean isMethodSelected(String fullMethodName) {
+        KafkaLoggingProperties.MethodSelectionConfig config = properties.getMethodSelection();
+        
+        if (config == null) {
+            return false;
+        }
+        
+        // Check if method is explicitly excluded
+        for (String pattern : config.getExcludePatterns()) {
+            String regex = pattern
+                    .replace(".", "\\.")
+                    .replace("*", ".*");
+            
+            if (Pattern.matches(regex, fullMethodName)) {
+                return false;
+            }
+        }
+        
+        // Check if method matches include patterns
+        for (String pattern : config.getIncludePatterns()) {
+            String regex = pattern
+                    .replace(".", "\\.")
+                    .replace("*", ".*");
+            
+            if (Pattern.matches(regex, fullMethodName)) {
+                return true;
+            }
+        }
+        
+        // Check if method's class is included
+        String className = fullMethodName.substring(0, fullMethodName.lastIndexOf('.'));
+        for (String includedClass : config.getIncludeClasses()) {
+            if (className.equals(includedClass)) {
+                return true;
+            }
+        }
+        
+        // Check if method's package is included
+        for (String includedPackage : config.getIncludePackages()) {
+            if (className.startsWith(includedPackage)) {
                 return true;
             }
         }

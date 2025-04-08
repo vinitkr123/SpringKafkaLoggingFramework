@@ -2,6 +2,7 @@ package com.logging.framework.aspect;
 
 import com.logging.framework.annotation.LogMethod;
 import com.logging.framework.model.LoggingEvent;
+import com.logging.framework.model.MethodExecutionStatus;
 import com.logging.framework.service.LoggingService;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -46,6 +47,7 @@ public class CustomMethodLoggingAspect {
         event.setClassName(className);
         event.setMethodName(methodName);
         event.setLogLevel(annotation.level());
+        event.setStatus(MethodExecutionStatus.IN_PROGRESS);
         
         // Log arguments if configured
         if (annotation.includeArgs()) {
@@ -55,16 +57,32 @@ public class CustomMethodLoggingAspect {
             loggingService.logMethodEntry(className, methodName, null);
         }
         
+        // Log initial status
+        String description = annotation.description().isEmpty() ? 
+                "Executing method" : annotation.description();
+        loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.IN_PROGRESS, 
+                description + " - Started");
+        
         long startTime = System.currentTimeMillis();
         Object result = null;
         
         try {
             // Execute the method
             result = joinPoint.proceed();
+            
+            // Set status to PASSED
+            event.setStatus(MethodExecutionStatus.PASSED);
+            
             return result;
         } catch (Throwable throwable) {
-            // Set exception in event
+            // Set status to FAILED and set exception
+            event.setStatus(MethodExecutionStatus.FAILED);
             event.setException(throwable);
+            
+            // Log failure status
+            loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.FAILED, 
+                    description + " - Failed: " + throwable.getMessage());
+            
             throw throwable;
         } finally {
             long executionTime = System.currentTimeMillis() - startTime;
@@ -82,9 +100,15 @@ public class CustomMethodLoggingAspect {
             // Log the event
             loggingService.logEvent(event);
             
-            // Log method exit if arguments were logged
+            // Log method exit with status
             if (annotation.includeArgs() && annotation.includeResult()) {
-                loggingService.logMethodExit(className, methodName, result, executionTime);
+                loggingService.logMethodExit(className, methodName, result, executionTime, event.getStatus());
+            }
+            
+            // Log final status if successful
+            if (event.getStatus() == MethodExecutionStatus.PASSED) {
+                loggingService.logMethodStatus(className, methodName, MethodExecutionStatus.PASSED, 
+                        description + " - Completed in " + executionTime + " ms");
             }
         }
     }
