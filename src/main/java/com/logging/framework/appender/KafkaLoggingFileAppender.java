@@ -100,18 +100,19 @@ public class KafkaLoggingFileAppender {
             // Log the message with the appropriate level
             Level level = Level.toLevel(event.getLogLevel(), Level.INFO);
             
+            String logMsg = event.toJsonString();
             if (level == Level.ERROR) {
-                kafkaLogger.error(event.toLogString());
+                kafkaLogger.error(logMsg);
             } else if (level == Level.WARN) {
-                kafkaLogger.warn(event.toLogString());
+                kafkaLogger.warn(logMsg);
             } else if (level == Level.INFO) {
-                kafkaLogger.info(event.toLogString());
+                kafkaLogger.info(logMsg);
             } else if (level == Level.DEBUG) {
-                kafkaLogger.debug(event.toLogString());
+                kafkaLogger.debug(logMsg);
             } else if (level == Level.TRACE) {
-                kafkaLogger.trace(event.toLogString());
+                kafkaLogger.trace(logMsg);
             } else {
-                kafkaLogger.info(event.toLogString());
+                kafkaLogger.info(logMsg);
             }
         } finally {
             // Clear MDC values
