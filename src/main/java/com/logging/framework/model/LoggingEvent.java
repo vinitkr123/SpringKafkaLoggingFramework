@@ -1,8 +1,11 @@
 package com.logging.framework.model;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Arrays;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * Model representing a logging event.
@@ -25,7 +28,7 @@ public class LoggingEvent {
     public LoggingEvent() {
         this.timestamp = LocalDateTime.now();
         this.status = MethodExecutionStatus.IN_PROGRESS;
-        this.additionalContext = new HashMap<>();
+        this.additionalContext = new LinkedHashMap<>();
     }
     
     /**
@@ -85,6 +88,45 @@ public class LoggingEvent {
         }
         
         return sb.toString();
+    }
+
+    /**
+     * Convert this logging event to a JSON string with a consistent field order.
+     *
+     * @return JSON representation of the event
+     */
+    public String toJsonString() {
+        Map<String, Object> jsonMap = new LinkedHashMap<>();
+        jsonMap.put("timestamp", timestamp.toString());
+        jsonMap.put("level", logLevel);
+        jsonMap.put("status", status);
+        jsonMap.put("class", className);
+        jsonMap.put("method", methodName);
+        if (executionTimeMs > 0) {
+            jsonMap.put("durationMs", executionTimeMs);
+        }
+        if (arguments != null && arguments.length > 0) {
+            jsonMap.put("arguments", Arrays.toString(arguments));
+        }
+        if (result != null) {
+            jsonMap.put("result", result);
+        }
+        if (kafkaMessageContext != null) {
+            jsonMap.put("kafka", kafkaMessageContext);
+        }
+        if (!additionalContext.isEmpty()) {
+            jsonMap.put("context", additionalContext);
+        }
+        if (exception != null) {
+            jsonMap.put("exception", exception.getClass().getSimpleName() + ": " + exception.getMessage());
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(jsonMap);
+        } catch (JsonProcessingException e) {
+            return jsonMap.toString();
+        }
     }
     
     // Getters and Setters
